@@ -3,29 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>הרפתקאות בובו הארנב - רספונסיבי משופר</title>
+    <title>הרפתקאות בובו הארנב - שליטת מגע משופרת</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         /* Basic reset and body styling */
-        html, body {
-            height: 100%; /* Ensure html and body take full height */
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Prevent scrolling on the body */
-            background-color: #2c3e50;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            -webkit-tap-highlight-color: transparent;
+        html {
+            height: 100%; /* Ensure html takes full height */
         }
-
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
-             /* Use space-between to push game to top and controls to bottom */
-            justify-content: space-between; 
-            padding: 5px; 
+            /* Use justify-content: space-around to push content apart vertically */
+            justify-content: space-around; 
+            min-height: 100%; /* Ensure body tries to fill height */
+            margin: 0;
+            padding: 5px; /* Minimal padding */
             box-sizing: border-box;
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            /* Allow vertical scrolling ONLY if content overflows significantly */
+            overflow-x: hidden; 
+            overflow-y: auto; 
+            -webkit-tap-highlight-color: transparent;
         }
 
         /* Container for the entire game interface */
@@ -35,7 +36,8 @@
             align-items: center;
             width: 100%;
             max-width: 800px; /* Max width constraint */
-             /* Let flexbox handle height distribution */
+            flex-shrink: 0; /* Prevent game area from shrinking too much */
+            padding-bottom: 10px; /* Add some space at the bottom */
         }
 
         /* Container specifically for the canvas */
@@ -43,44 +45,43 @@
             position: relative; /* For HUD */
             width: 100%; /* Takes full width of gameArea */
             max-width: 800px;
-            margin: 5px auto; 
+            margin: 5px auto; /* Reduced margin */
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             border-radius: 10px;
             overflow: hidden; 
-            /* Height will be set by JS to maintain aspect ratio */
-            flex-shrink: 0; /* Prevent shrinking */
+            /* Height will be set by JS */
         }
 
         /* Canvas styling */
         canvas#gameCanvas {
-            display: block; 
+            display: block; /* Remove extra space */
             width: 100%;   /* Fill container width */
             height: 100%;  /* Fill container height (set by JS) */
             border: 2px solid #34495e;
             border-radius: 8px;
             background-color: #87CEEB; /* Default background */
             box-sizing: border-box;
-            touch-action: none; 
+            touch-action: none; /* Prevent default touch actions like scroll/zoom */
         }
 
         /* HUD Styling */
         #hud {
             position: absolute; 
-            top: 8px; 
+            top: 8px; /* Slightly smaller spacing */
             left: 8px;
-            font-size: clamp(11px, 2.5vw, 16px); 
+            font-size: clamp(11px, 2.5vw, 16px); /* Adjusted responsive font size */
             color: white;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
             z-index: 10; 
             background-color: rgba(0, 0, 0, 0.4);
-            padding: 6px 10px; 
+            padding: 6px 10px; /* Adjusted padding */
             border-radius: 6px;
             pointer-events: none; 
         }
 
         /* Message area styling */
         #messages {
-            margin-top: 10px; 
+            margin-top: 10px; /* Reduced margin */
             font-size: clamp(14px, 3.5vw, 18px); 
             color: #f1c40f; 
             text-align: center;
@@ -88,7 +89,6 @@
             font-weight: bold;
             width: 90%;
             max-width: 600px;
-            flex-shrink: 0; /* Prevent shrinking */
         }
 
         /* Start button styling */
@@ -97,8 +97,7 @@
             font-size: clamp(14px, 3.5vw, 18px); 
             font-weight: bold;
             cursor: pointer;
-            margin-top: 10px; 
-            margin-bottom: 10px; /* Add margin bottom */
+            margin-top: 10px; /* Reduced margin */
             background: linear-gradient(145deg, #3498db, #2980b9); 
             color: white;
             border: none;

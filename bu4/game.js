@@ -1,40 +1,36 @@
-/**
- * Bobo's Adventure Game
- * * A multi-level 2D platformer with scrolling, progressive difficulty,
- * sound effects, responsive design with swipe controls.
- */
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const gameContainer = document.getElementById('gameContainer'); 
-    const gameArea = document.getElementById('gameArea'); 
+    const gameContainer = document.getElementById('gameContainer'); // Get container for resizing
     const messagesDiv = document.getElementById('messages');
     const startButton = document.getElementById('startButton');
     const heartsDisplay = document.getElementById('hearts');
     const carrotsCollectedDisplay = document.getElementById('carrotsCollected');
     const totalCarrotsDisplay = document.getElementById('totalCarrotsInLevel');
+    // Note: References to old touch buttons (touchLeft, etc.) are effectively removed
 
     // --- Game Constants ---
-    const INTERNAL_WIDTH = 800;  
-    const INTERNAL_HEIGHT = 400; 
-    const ASPECT_RATIO = INTERNAL_WIDTH / INTERNAL_HEIGHT; 
-    canvas.width = INTERNAL_WIDTH; 
+    const INTERNAL_WIDTH = 800;  // Fixed internal resolution width
+    const INTERNAL_HEIGHT = 400; // Fixed internal resolution height
+    const ASPECT_RATIO = INTERNAL_WIDTH / INTERNAL_HEIGHT; // 2:1
+    canvas.width = INTERNAL_WIDTH; // Set internal canvas size
     canvas.height = INTERNAL_HEIGHT;
 
     const GRAVITY = 0.6;
-    const PLAYER_SPEED = 3.5; 
-    const PLAYER_RUN_SPEED = 6; 
-    const JUMP_FORCE = 13;      
-    const MAX_JUMP_BOOST = 4;   
-    const MIN_JUMP_HEIGHT = 5;  
-    const INVINCIBILITY_DURATION = 2000; 
+    const PLAYER_SPEED = 3.5; // Base speed when walking
+    const PLAYER_RUN_SPEED = 6; // Max speed when running/swiping fast
+    const JUMP_FORCE = 13;      // Base jump force
+    const MAX_JUMP_BOOST = 4;   // Additional force for strong swipe up
+    const MIN_JUMP_HEIGHT = 5;  // Minimum jump velocity if swipe is short
+    const INVINCIBILITY_DURATION = 2000; // ms
     const MAX_LIVES = 5;
 
     // --- Touch Control Constants ---
-    const SWIPE_THRESHOLD_X = 25;  
-    const SWIPE_THRESHOLD_Y_JUMP = -45; 
-    const SWIPE_THRESHOLD_Y_CROUCH = 45; 
+    const SWIPE_THRESHOLD_X = 20;  // Min horizontal distance for swipe movement
+    const SWIPE_THRESHOLD_Y_JUMP = -40; // Min *negative* vertical distance for jump swipe
+    const SWIPE_THRESHOLD_Y_CROUCH = 40; // Min positive vertical distance for crouch swipe
+    const MAX_SWIPE_SPEED_DIST_X = 150; // Horizontal distance at which max speed is reached (currently unused)
 
     // --- Game State Variables ---
     let cameraX = 0;
@@ -43,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let carrots = [];
     let enemies = [];
     let exit = null;
-    let keys = {}; 
+    let keys = {}; // Still used internally for keyboard AND touch simulation
     let lives = 3;
     let requiredCarrots = 0;
     let collectedCarrotsCount = 0;
@@ -51,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let gameStarted = false;
     let isInvincible = false;
     let invincibilityTimer = 0;
-    let currentSpeed = PLAYER_SPEED; 
+    let currentSpeed = PLAYER_SPEED; // Player's current max horizontal speed
     let gameLoopId = null;
     let soundsInitialized = false;
     let currentLevelIndex = 0;
@@ -63,12 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let touchCurrentX = 0;
     let touchCurrentY = 0;
     let isTouching = false;
-    let touchId = null; 
-    let touchJumped = false; 
-    let touchCrouched = false; 
+    let touchId = null; // To track a specific finger
+    let touchJumped = false; // Flag to prevent multiple jumps per swipe
+    let touchCrouched = false; // Flag to prevent multiple crouches per swipe
 
     // --- Sound Effects Setup (Tone.js) ---
-    const sounds = { /* ... (sound definitions remain the same) ... */ 
+    const sounds = {
         jump: new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.05, release: 0.1 }, volume: -12 }).toDestination(),
         collect: new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.2, sustain: 0.01, release: 0.1 }, volume: -10 }).toDestination(),
         hit: new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.1 }, volume: -8 }).toDestination(),
@@ -80,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     /** Plays a predefined sound effect. */
-    function playSound(soundName) { /* ... (same as before) ... */ 
+    function playSound(soundName) {
         if (!soundsInitialized || !sounds[soundName]) return;
         try {
             if (Tone.context.state !== 'running') Tone.context.resume();
@@ -96,14 +92,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /** Initializes the Tone.js audio context. */
-    async function initializeSounds() { /* ... (same as before) ... */ 
+    async function initializeSounds() {
         if (soundsInitialized) return;
-        try { await Tone.start(); soundsInitialized = true; console.log("Audio context started"); }
-        catch (e) { console.error("Could not start Tone.js audio context:", e); }
+        try {
+            await Tone.start();
+            soundsInitialized = true;
+            console.log("Audio context started");
+        } catch (e) {
+            console.error("Could not start Tone.js audio context:", e);
+        }
     }
 
-    // --- Level Generation Helpers --- (Remain the same)
-    function generatePlatforms(levelWidth, yOffset, count, minWidth, maxWidth, minGap, maxGap, canBeMoving = false, movingChance = 0.2) { /* ... */ 
+    // --- Level Generation Helpers ---
+    /** Generates platform objects for a level. */
+    function generatePlatforms(levelWidth, yOffset, count, minWidth, maxWidth, minGap, maxGap, canBeMoving = false, movingChance = 0.2) {
         const plats = []; let currentX = 150;
         for (let i = 0; i < count; i++) {
             if (currentX > levelWidth - maxWidth - 50) break;
@@ -118,7 +120,8 @@ document.addEventListener('DOMContentLoaded', () => {
             plats.push(platform); currentX += width + (Math.random() * (maxGap - minGap) + minGap);
         } return plats;
     }
-    function generateCarrots(platforms, chance = 0.5) { /* ... */ 
+    /** Generates carrot objects above platforms. */
+    function generateCarrots(platforms, chance = 0.5) {
         const crts = [];
         platforms.forEach(p => {
             if (Math.random() < chance && p.width > 30) {
@@ -126,7 +129,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }); return crts;
     }
-    function generateEnemies(levelWidth, count, yLevel, baseSpeed, patrolRangeWidth) { /* ... */ 
+    /** Generates enemy objects. */
+    function generateEnemies(levelWidth, count, yLevel, baseSpeed, patrolRangeWidth) {
         const enms = [];
         for (let i = 0; i < count; i++) {
             const startX = 200 + Math.random() * (levelWidth - patrolRangeWidth - 300);
@@ -141,15 +145,56 @@ document.addEventListener('DOMContentLoaded', () => {
         } return enms;
     }
 
-    // --- Level Data Definition --- (Remains the same)
-    const initialLevels = [ /* Level 1 */ { width: 3200, bgColor: '#87CEEB', groundColor: '#28a745', platformColor: '#6f4e37', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 400, height: 20 }, { worldX: 500, y: INTERNAL_HEIGHT - 20, width: 600, height: 20 }, { worldX: 1200, y: INTERNAL_HEIGHT - 20, width: 800, height: 20 }, { worldX: 2100, y: INTERNAL_HEIGHT - 20, width: 3200 - 2100, height: 20 }, { worldX: 150, y: INTERNAL_HEIGHT - 80, width: 100, height: 20 }, { worldX: 300, y: INTERNAL_HEIGHT - 140, width: 120, height: 20 }, { worldX: 550, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 700, y: INTERNAL_HEIGHT - 180, width: 80, height: 20 }, { worldX: 850, y: INTERNAL_HEIGHT - 120, width: 100, height: 20 }, { worldX: 1000, y: INTERNAL_HEIGHT - 90, width: 130, height: 20 }, { worldX: 1150, y: INTERNAL_HEIGHT - 150, width: 100, height: 20 }, { worldX: 1300, y: INTERNAL_HEIGHT - 200, width: 120, height: 20 }, { worldX: 1500, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 1600, y: INTERNAL_HEIGHT - 160, width: 70, height: 20, type: 'moving', speed: 1, range: 50, dir: 1, originalWorldX: 1600 }, { worldX: 1750, y: INTERNAL_HEIGHT - 130, width: 100, height: 20 }, { worldX: 1900, y: INTERNAL_HEIGHT - 70, width: 90, height: 20 }, { worldX: 2050, y: INTERNAL_HEIGHT - 140, width: 110, height: 20 }, { worldX: 2200, y: INTERNAL_HEIGHT - 190, width: 100, height: 20 }, { worldX: 2350, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 2500, y: INTERNAL_HEIGHT - 150, width: 80, height: 20 }, { worldX: 2650, y: INTERNAL_HEIGHT - 220, width: 120, height: 20 }, { worldX: 2800, y: INTERNAL_HEIGHT - 120, width: 100, height: 20 }, { worldX: 2950, y: INTERNAL_HEIGHT - 170, width: 130, height: 20, type: 'moving', speed: 1.5, range: 70, dir: 1, originalWorldX: 2950 }], carrots: [ { worldX: 180, y: INTERNAL_HEIGHT - 105, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 350, y: INTERNAL_HEIGHT - 165, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 1350, y: INTERNAL_HEIGHT - 225, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 2250, y: INTERNAL_HEIGHT - 215, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 3000, y: INTERNAL_HEIGHT - 50, width: 15, height: 25, color: '#fd7e14', collected: false }], enemies: [ { worldX: 400, y: INTERNAL_HEIGHT - 50, width: 40, height: 30, color: '#dc3545', speed: 1, originalSpeed: 1, direction: 1, patrolRange: { start: 300, end: 500 }}, { worldX: 900, y: INTERNAL_HEIGHT - 50, width: 40, height: 30, color: '#dc3545', speed: 1.2, originalSpeed: 1.2, direction: 1, patrolRange: { start: 800, end: 1050 }}], exitY: INTERNAL_HEIGHT - 60, requiredCarrotsFraction: 0.6 }, /* Levels 2-5 */ { width: 3500, bgColor: '#34495e', groundColor: '#555', platformColor: '#4a4a4a', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 300, height: 20 }, { worldX: 400, y: INTERNAL_HEIGHT - 20, width: 500, height: 20 }, { worldX: 1000, y: INTERNAL_HEIGHT - 20, width: 700, height: 20 }, { worldX: 1800, y: INTERNAL_HEIGHT - 20, width: 3500 - 1800, height: 20 }, ...generatePlatforms(3500, 70, 12, 60, 100, 80, 150, true, 0.3) ], carrots: [], enemies: generateEnemies(3500, 4, 50, 1.3, 200), exitY: INTERNAL_HEIGHT - 70, requiredCarrotsFraction: 0.7 }, { width: 4000, bgColor: '#e0f7fa', groundColor: '#c0c0c0', platformColor: '#add8e6', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 200, height: 20 }, { worldX: 300, y: INTERNAL_HEIGHT - 20, width: 400, height: 20 }, { worldX: 800, y: INTERNAL_HEIGHT - 20, width: 600, height: 20 }, { worldX: 1500, y: INTERNAL_HEIGHT - 20, width: 4000 - 1500, height: 20 }, ...generatePlatforms(4000, 60, 15, 50, 90, 100, 180, true, 0.4) ], carrots: [], enemies: generateEnemies(4000, 5, 50, 1.5, 180), exitY: INTERNAL_HEIGHT - 60, requiredCarrotsFraction: 0.75 }, { width: 3800, bgColor: '#4a4e69', groundColor: '#22333b', platformColor: '#5e503f', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 350, height: 20 }, { worldX: 450, y: INTERNAL_HEIGHT - 20, width: 550, height: 20 }, { worldX: 1100, y: INTERNAL_HEIGHT - 20, width: 750, height: 20 }, { worldX: 1950, y: INTERNAL_HEIGHT - 20, width: 3800 - 1950, height: 20 }, ...generatePlatforms(3800, 80, 14, 70, 110, 90, 160, true, 0.35) ], carrots: [], enemies: generateEnemies(3800, 6, 50, 1.4, 220), exitY: INTERNAL_HEIGHT - 65, requiredCarrotsFraction: 0.7 }, { width: 4200, bgColor: '#9db4c0', groundColor: '#778899', platformColor: '#5c6b73', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 150, height: 20 }, { worldX: 500, y: INTERNAL_HEIGHT - 20, width: 200, height: 20 }, { worldX: 1200, y: INTERNAL_HEIGHT - 20, width: 180, height: 20 }, { worldX: 2000, y: INTERNAL_HEIGHT - 20, width: 250, height: 20 }, { worldX: 3800, y: INTERNAL_HEIGHT - 20, width: 4200 - 3800, height: 20 }, ...generatePlatforms(4200, 50, 18, 40, 80, 120, 200, true, 0.5) ], carrots: [], enemies: generateEnemies(4200, 7, 50, 1.6, 150), exitY: INTERNAL_HEIGHT - 80, requiredCarrotsFraction: 0.8 }];
+    // --- Level Data Definition ---
+    // Define initial levels first
+    const initialLevels = [
+        // Level 1
+        { width: 3200, bgColor: '#87CEEB', groundColor: '#28a745', platformColor: '#6f4e37', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 400, height: 20 }, { worldX: 500, y: INTERNAL_HEIGHT - 20, width: 600, height: 20 }, { worldX: 1200, y: INTERNAL_HEIGHT - 20, width: 800, height: 20 }, { worldX: 2100, y: INTERNAL_HEIGHT - 20, width: 3200 - 2100, height: 20 }, { worldX: 150, y: INTERNAL_HEIGHT - 80, width: 100, height: 20 }, { worldX: 300, y: INTERNAL_HEIGHT - 140, width: 120, height: 20 }, { worldX: 550, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 700, y: INTERNAL_HEIGHT - 180, width: 80, height: 20 }, { worldX: 850, y: INTERNAL_HEIGHT - 120, width: 100, height: 20 }, { worldX: 1000, y: INTERNAL_HEIGHT - 90, width: 130, height: 20 }, { worldX: 1150, y: INTERNAL_HEIGHT - 150, width: 100, height: 20 }, { worldX: 1300, y: INTERNAL_HEIGHT - 200, width: 120, height: 20 }, { worldX: 1500, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 1600, y: INTERNAL_HEIGHT - 160, width: 70, height: 20, type: 'moving', speed: 1, range: 50, dir: 1, originalWorldX: 1600 }, { worldX: 1750, y: INTERNAL_HEIGHT - 130, width: 100, height: 20 }, { worldX: 1900, y: INTERNAL_HEIGHT - 70, width: 90, height: 20 }, { worldX: 2050, y: INTERNAL_HEIGHT - 140, width: 110, height: 20 }, { worldX: 2200, y: INTERNAL_HEIGHT - 190, width: 100, height: 20 }, { worldX: 2350, y: INTERNAL_HEIGHT - 100, width: 150, height: 20 }, { worldX: 2500, y: INTERNAL_HEIGHT - 150, width: 80, height: 20 }, { worldX: 2650, y: INTERNAL_HEIGHT - 220, width: 120, height: 20 }, { worldX: 2800, y: INTERNAL_HEIGHT - 120, width: 100, height: 20 }, { worldX: 2950, y: INTERNAL_HEIGHT - 170, width: 130, height: 20, type: 'moving', speed: 1.5, range: 70, dir: 1, originalWorldX: 2950 }], carrots: [ { worldX: 180, y: INTERNAL_HEIGHT - 105, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 350, y: INTERNAL_HEIGHT - 165, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 1350, y: INTERNAL_HEIGHT - 225, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 2250, y: INTERNAL_HEIGHT - 215, width: 15, height: 25, color: '#fd7e14', collected: false }, { worldX: 3000, y: INTERNAL_HEIGHT - 50, width: 15, height: 25, color: '#fd7e14', collected: false }], enemies: [ { worldX: 400, y: INTERNAL_HEIGHT - 50, width: 40, height: 30, color: '#dc3545', speed: 1, originalSpeed: 1, direction: 1, patrolRange: { start: 300, end: 500 }}, { worldX: 900, y: INTERNAL_HEIGHT - 50, width: 40, height: 30, color: '#dc3545', speed: 1.2, originalSpeed: 1.2, direction: 1, patrolRange: { start: 800, end: 1050 }}], exitY: INTERNAL_HEIGHT - 60, requiredCarrotsFraction: 0.6 },
+        // Level 2
+        { width: 3500, bgColor: '#34495e', groundColor: '#555', platformColor: '#4a4a4a', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 300, height: 20 }, { worldX: 400, y: INTERNAL_HEIGHT - 20, width: 500, height: 20 }, { worldX: 1000, y: INTERNAL_HEIGHT - 20, width: 700, height: 20 }, { worldX: 1800, y: INTERNAL_HEIGHT - 20, width: 3500 - 1800, height: 20 }, ...generatePlatforms(3500, 70, 12, 60, 100, 80, 150, true, 0.3) ], carrots: [], enemies: generateEnemies(3500, 4, 50, 1.3, 200), exitY: INTERNAL_HEIGHT - 70, requiredCarrotsFraction: 0.7 },
+        // Level 3
+        { width: 4000, bgColor: '#e0f7fa', groundColor: '#c0c0c0', platformColor: '#add8e6', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 200, height: 20 }, { worldX: 300, y: INTERNAL_HEIGHT - 20, width: 400, height: 20 }, { worldX: 800, y: INTERNAL_HEIGHT - 20, width: 600, height: 20 }, { worldX: 1500, y: INTERNAL_HEIGHT - 20, width: 4000 - 1500, height: 20 }, ...generatePlatforms(4000, 60, 15, 50, 90, 100, 180, true, 0.4) ], carrots: [], enemies: generateEnemies(4000, 5, 50, 1.5, 180), exitY: INTERNAL_HEIGHT - 60, requiredCarrotsFraction: 0.75 },
+        // Level 4
+        { width: 3800, bgColor: '#4a4e69', groundColor: '#22333b', platformColor: '#5e503f', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 350, height: 20 }, { worldX: 450, y: INTERNAL_HEIGHT - 20, width: 550, height: 20 }, { worldX: 1100, y: INTERNAL_HEIGHT - 20, width: 750, height: 20 }, { worldX: 1950, y: INTERNAL_HEIGHT - 20, width: 3800 - 1950, height: 20 }, ...generatePlatforms(3800, 80, 14, 70, 110, 90, 160, true, 0.35) ], carrots: [], enemies: generateEnemies(3800, 6, 50, 1.4, 220), exitY: INTERNAL_HEIGHT - 65, requiredCarrotsFraction: 0.7 },
+        // Level 5
+        { width: 4200, bgColor: '#9db4c0', groundColor: '#778899', platformColor: '#5c6b73', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 150, height: 20 }, { worldX: 500, y: INTERNAL_HEIGHT - 20, width: 200, height: 20 }, { worldX: 1200, y: INTERNAL_HEIGHT - 20, width: 180, height: 20 }, { worldX: 2000, y: INTERNAL_HEIGHT - 20, width: 250, height: 20 }, { worldX: 3800, y: INTERNAL_HEIGHT - 20, width: 4200 - 3800, height: 20 }, ...generatePlatforms(4200, 50, 18, 40, 80, 120, 200, true, 0.5) ], carrots: [], enemies: generateEnemies(4200, 7, 50, 1.6, 150), exitY: INTERNAL_HEIGHT - 80, requiredCarrotsFraction: 0.8 },
+    ];
+
+    // **FIXED:** Create the final array *after* initial levels are defined
     const allLevelsData = [...initialLevels]; 
-    const level5Data = allLevelsData[4]; 
-    for (let i = 1; i <= 5; i++) { const levelNum = i + 5; const newLevelWidth = level5Data.width + i * 200; const newBgColor = `hsl(${200 + i * 10}, 50%, ${60 - i * 2}%)`; const newGroundColor = `hsl(${120 + i * 5}, 30%, ${40 - i * 2}%)`; const newPlatformColor = `hsl(${30 + i * 5}, 30%, ${35 - i * 2}%)`; allLevelsData.push({ width: newLevelWidth, bgColor: newBgColor, groundColor: newGroundColor, platformColor: newPlatformColor, platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 100 + i*10, height: 20 }, { worldX: newLevelWidth - (100 + i*10), y: INTERNAL_HEIGHT - 20, width: 100 + i*10, height: 20 }, ...generatePlatforms(newLevelWidth, 40 + i*5, 18 + i, 35 - i*2, 75 - i*3, 130 + i*10, 220 + i*10, true, 0.5 + i*0.05) ], carrots: [], enemies: generateEnemies(newLevelWidth, 7 + i, 50, 1.6 + i * 0.1, 140 - i*5), exitY: INTERNAL_HEIGHT - (80 + i*5), requiredCarrotsFraction: Math.min(0.95, 0.8 + i * 0.03) }); }
-    allLevelsData.push({ width: 1000, bgColor: '#200000', groundColor: '#100000', platformColor: '#301010', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 1000, height: 20 } ], carrots: [], enemies: [ { worldX: 450, y: INTERNAL_HEIGHT - 100, width: 100, height: 80, color: '#ff0000', speed: 0, originalSpeed: 0, direction: 1, patrolRange: {start: 450, end: 450}, isBoss: true } ], exitY: INTERNAL_HEIGHT - 100, requiredCarrotsFraction: 0, isBossLevel: true });
+
+    // Auto-generate levels 6-10 and push them
+    const level5Data = allLevelsData[4]; // Base the generation on level 5 data
+    for (let i = 1; i <= 5; i++) {
+        const levelNum = i + 5; // Level numbers 6 through 10
+        const newLevelWidth = level5Data.width + i * 200;
+        const newBgColor = `hsl(${200 + i * 10}, 50%, ${60 - i * 2}%)`;
+        const newGroundColor = `hsl(${120 + i * 5}, 30%, ${40 - i * 2}%)`;
+        const newPlatformColor = `hsl(${30 + i * 5}, 30%, ${35 - i * 2}%)`;
+        allLevelsData.push({ 
+            width: newLevelWidth, bgColor: newBgColor, groundColor: newGroundColor, platformColor: newPlatformColor, 
+            platforms: [ 
+                { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 100 + i*10, height: 20 }, 
+                { worldX: newLevelWidth - (100 + i*10), y: INTERNAL_HEIGHT - 20, width: 100 + i*10, height: 20 }, 
+                ...generatePlatforms(newLevelWidth, 40 + i*5, 18 + i, 35 - i*2, 75 - i*3, 130 + i*10, 220 + i*10, true, 0.5 + i*0.05) 
+            ], 
+            carrots: [], // To be generated in loadLevel
+            enemies: generateEnemies(newLevelWidth, 7 + i, 50, 1.6 + i * 0.1, 140 - i*5), 
+            exitY: INTERNAL_HEIGHT - (80 + i*5), 
+            requiredCarrotsFraction: Math.min(0.95, 0.8 + i * 0.03) 
+        });
+    }
+    // Push the final boss level (Level 11)
+    allLevelsData.push({ 
+        width: 1000, bgColor: '#200000', groundColor: '#100000', platformColor: '#301010', 
+        platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 1000, height: 20 } ], carrots: [], 
+        enemies: [ { worldX: 450, y: INTERNAL_HEIGHT - 100, width: 100, height: 80, color: '#ff0000', speed: 0, originalSpeed: 0, direction: 1, patrolRange: {start: 450, end: 450}, isBoss: true } ], 
+        exitY: INTERNAL_HEIGHT - 100, requiredCarrotsFraction: 0, isBossLevel: true 
+    });
+
 
     /** Loads level data, resets player/camera, generates procedural elements. */
-    function loadLevel(levelIndex) { /* ... (same as before) ... */ 
+    function loadLevel(levelIndex) {
         if (levelIndex >= allLevelsData.length) { winGame(); return; }
         currentLevelData = JSON.parse(JSON.stringify(allLevelsData[levelIndex])); 
         currentLevelData.platforms.forEach(p => {
@@ -172,7 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /** Starts or restarts the game. */
-    function startGame(startFreshGame = false) { /* ... (same as before) ... */ 
+    function startGame(startFreshGame = false) {
         if (startFreshGame) { currentLevelIndex = 0; lives = 3; }
         isGameOver = false; gameStarted = true;
         startButton.style.display = 'none'; messagesDiv.textContent = '';
@@ -183,14 +228,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Input Handling ---
 
     // Keyboard Input
-    document.addEventListener('keydown', (e) => { /* ... (same as before) ... */ 
+    document.addEventListener('keydown', (e) => {
         if (e.key === 'r' || e.key === 'R') { if (gameStarted || isGameOver) { if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; } startGame(true); } return; }
         keys[e.key] = true; if (isGameOver || !gameStarted || !player) return;
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const now = Date.now(); if (now - lastKeyPressTime[e.key] < DOUBLE_TAP_THRESHOLD) currentSpeed = PLAYER_RUN_SPEED; else currentSpeed = PLAYER_SPEED; lastKeyPressTime[e.key] = now; }
         if ((e.key === 'ArrowUp' || e.key === ' ') && player.isOnGround && !player.isJumping) { player.isJumping = true; player.isOnGround = false; player.velocityY = -JUMP_FORCE; player.canVariableJump = true; player.jumpButtonPressedTime = Date.now(); playSound('jump'); }
         if (e.key === 'ArrowDown' && !player.isCrouching && player.isOnGround) { player.isCrouching = true; player.drawHeight = 25; player.drawWidth = 35; }
     });
-    document.addEventListener('keyup', (e) => { /* ... (same as before) ... */ 
+    document.addEventListener('keyup', (e) => {
         keys[e.key] = false; if (isGameOver || !gameStarted || !player) return;
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { if (!keys['ArrowLeft'] && !keys['ArrowRight']) currentSpeed = PLAYER_SPEED; }
         if ((e.key === 'ArrowUp' || e.key === ' ') && player.canVariableJump) { player.canVariableJump = false; if (player.velocityY < -MIN_JUMP_HEIGHT) { const pressDuration = Date.now() - player.jumpButtonPressedTime; if (pressDuration < 150) player.velocityY = -MIN_JUMP_HEIGHT * 1.5; } }
@@ -202,10 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function getTouchPos(canvasDom, touchEvent) {
         const rect = canvasDom.getBoundingClientRect();
         const touch = touchEvent.changedTouches[0]; 
-        const clientWidth = canvasDom.clientWidth || 1; 
-        const clientHeight = canvasDom.clientHeight || 1;
-        const scaledX = (touch.clientX - rect.left) * (INTERNAL_WIDTH / clientWidth);
-        const scaledY = (touch.clientY - rect.top) * (INTERNAL_HEIGHT / clientHeight);
+        const scaledX = (touch.clientX - rect.left) * (INTERNAL_WIDTH / canvasDom.clientWidth);
+        const scaledY = (touch.clientY - rect.top) * (INTERNAL_HEIGHT / canvasDom.clientHeight);
         return { x: scaledX, y: scaledY };
     }
     canvas.addEventListener('touchstart', (e) => {
@@ -213,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isGameOver || !gameStarted) return; 
         if (!isTouching) { 
             const pos = getTouchPos(canvas, e);
-            // console.log("Touch Start:", pos.x.toFixed(1), pos.y.toFixed(1)); // DEBUG
+            // console.log("Touch Start:", pos); // DEBUG
             touchStartX = pos.x; touchStartY = pos.y;
             touchCurrentX = pos.x; touchCurrentY = pos.y;
             isTouching = true; touchJumped = false; touchCrouched = false; 
@@ -240,9 +283,12 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSpeed = PLAYER_RUN_SPEED; 
         } else { 
             keys['ArrowLeft'] = false; keys['ArrowRight'] = false; 
-            if (!keys['ArrowLeft'] && !keys['ArrowRight']) { currentSpeed = PLAYER_SPEED; }
+            // Reset speed only if keyboard isn't also pressing a direction
+            if (!keys['ArrowLeft'] && !keys['ArrowRight']) { 
+                 currentSpeed = PLAYER_SPEED;
+            }
         }
-        // Vertical Movement (Jump/Crouch) - Prioritize Jump
+        // Vertical Movement (Jump/Crouch)
         if (deltaY < SWIPE_THRESHOLD_Y_JUMP && !touchJumped && player.isOnGround) { // Swipe Up
             // console.log("Jump Threshold Met"); // DEBUG
             player.isJumping = true; player.isOnGround = false;
@@ -250,9 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
             player.velocityY = -(JUMP_FORCE + jumpBoost);
             playSound('jump'); touchJumped = true; 
             keys['ArrowLeft'] = false; keys['ArrowRight'] = false; 
-            touchCrouched = false; // Cannot crouch and jump
-            keys['ArrowDown'] = false; 
-        } else if (deltaY > SWIPE_THRESHOLD_Y_CROUCH && !touchCrouched && !touchJumped && player.isOnGround && !player.isCrouching) { // Swipe Down
+        } else if (deltaY > SWIPE_THRESHOLD_Y_CROUCH && !touchCrouched && player.isOnGround && !player.isCrouching) { // Swipe Down
             // console.log("Crouch Threshold Met"); // DEBUG
             keys['ArrowDown'] = true; 
             player.isCrouching = true; player.drawHeight = 25; player.drawWidth = 35;
@@ -286,7 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     // --- Game Update Logic ---
-    function updatePlayer() { /* ... (same as before) ... */ 
+    /** Updates the player's state. */
+    function updatePlayer() { 
         if (isGameOver || !player || !currentLevelData) return; 
         player.velocityX = 0;
         if (keys['ArrowLeft'] && !player.isCrouching) player.velocityX = -currentSpeed;
@@ -298,9 +343,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (player.y + player.height > INTERNAL_HEIGHT + 50) loseLife(true);
         if (isInvincible) { invincibilityTimer -= 1000/60; if (invincibilityTimer <= 0) isInvincible = false; }
     }
-    function updateCamera() { /* ... (same as before) ... */ 
+    /** Updates the camera position. */
+    function updateCamera() { 
         if (!player || !currentLevelData) return;
-        const displayWidth = canvas.clientWidth || INTERNAL_WIDTH; 
+        const displayWidth = canvas.clientWidth; 
         const targetCameraX = player.worldX - (displayWidth / 2 - player.width / 2); 
         cameraX += (targetCameraX - cameraX) * 0.1; 
         if (cameraX < 0) cameraX = 0;
@@ -308,7 +354,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (maxCameraX < 0) { cameraX = 0; } 
         else if (cameraX > maxCameraX) { cameraX = maxCameraX; } 
     }
-    function updatePlatforms() { /* ... (same as before) ... */ 
+    /** Updates moving platforms. */
+    function updatePlatforms() { 
         if (!platforms) return;
         platforms.forEach(p => {
             if (p.type === 'moving') {
@@ -318,7 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    function updateEnemies() { /* ... (same as before) ... */ 
+    /** Updates enemies. */
+    function updateEnemies() { 
         if (isGameOver || !enemies || !currentLevelData) return;
         enemies.forEach(enemy => {
             if (enemy.isBoss) return;
@@ -328,12 +376,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (enemy.worldX <= enemy.patrolRange.start || enemy.worldX + enemy.width >= enemy.patrolRange.end) enemy.direction *= -1;
         });
     }
-    function getPlayerHitbox() { /* ... (same as before) ... */ 
+    /** Gets the player's hitbox. */
+    function getPlayerHitbox() { 
         if (!player) return {x:0,y:0,width:0,height:0};
         if (player.isCrouching) return { x: player.worldX, y: player.y + (player.height - player.drawHeight), width: player.drawWidth, height: player.drawHeight };
         return { x: player.worldX, y: player.y, width: player.width, height: player.height };
     }
-    function checkCollisions() { /* ... (same as before) ... */ 
+    /** Checks all collisions. */
+    function checkCollisions() { 
         if (isGameOver || !player || !platforms || !carrots || !enemies || !exit) return;
         const playerHitbox = getPlayerHitbox(); let onAnyPlatform = false; 
         platforms.forEach(platform => { const platformHitbox = { x: platform.worldX, y: platform.y, width: platform.width, height: platform.height }; if (isRectColliding(playerHitbox, platformHitbox)) { const prevPlayerBottom = (player.y + playerHitbox.height) - player.velocityY; if (player.velocityY >= 0 && prevPlayerBottom <= platform.y + 1) { player.y = platform.y - playerHitbox.height; player.velocityY = 0; player.isJumping = false; player.isOnGround = true; onAnyPlatform = true; if (platform.type === 'moving' && player.isOnGround) player.worldX += platform.speed * platform.dir; } else if (player.velocityY < 0 && player.y - player.velocityY >= platform.y + platform.height -1) { player.y = platform.y + platform.height; player.velocityY = 0; } else { if (player.velocityX > 0 && playerHitbox.x + playerHitbox.width - player.velocityX <= platform.worldX) { player.worldX = platform.worldX - playerHitbox.width; player.velocityX = 0; } else if (player.velocityX < 0 && playerHitbox.x - player.velocityX >= platform.worldX + platform.width) { player.worldX = platform.worldX + platform.width; player.velocityX = 0; } } } });
@@ -341,43 +391,45 @@ document.addEventListener('DOMContentLoaded', () => {
         enemies.forEach(enemy => { const enemyHitbox = { x: enemy.worldX, y: enemy.y, width: enemy.width, height: enemy.height }; if (isRectColliding(playerHitbox, enemyHitbox) && !isInvincible) { if (enemy.isBoss){ loseLife(); return; } const prevPlayerBottom = (player.y + playerHitbox.height) - player.velocityY; if (player.velocityY > 0 && prevPlayerBottom < enemy.y + 5 && !player.isCrouching) { enemies.splice(enemies.indexOf(enemy), 1); player.velocityY = -JUMP_FORCE / 1.5; player.isJumping = true; player.isOnGround = false; playSound('stomp'); } else loseLife(); } });
         if (exit && exit.isOpen && isRectColliding(playerHitbox, {x: exit.worldX, y: exit.y, width: exit.width, height: exit.height})) levelComplete(); 
     }
-    function isRectColliding(rect1, rect2) { /* ... (same as before) ... */ 
+    /** Basic rectangle collision check. */
+    function isRectColliding(rect1, rect2) { 
         return rect1.x < rect2.x + rect2.width && rect1.x + rect1.width > rect2.x && rect1.y < rect2.y + rect2.height && rect1.y + rect1.height > rect2.y;
     }
 
     // --- Game State Management ---
-    function loseLife(isFallDeath = false) { /* ... (same as before) ... */ 
+    function loseLife(isFallDeath = false) { 
         if (isInvincible || isGameOver) return; lives--; playSound('hit'); isInvincible = true; invincibilityTimer = INVINCIBILITY_DURATION; updateHUD();
         if (lives <= 0) gameOver();
         else { if (isFallDeath) { player.worldX = Math.max(50, cameraX + 100); player.y = INTERNAL_HEIGHT - 200; } else { player.worldX = Math.max(50, player.worldX - 50); player.y = INTERNAL_HEIGHT - 100; } player.velocityX = 0; player.velocityY = 0; player.isCrouching = false; player.drawHeight = player.height; player.drawWidth = player.width; messagesDiv.textContent = "נפסלת! נסה שוב."; setTimeout(() => { if(!isGameOver && messagesDiv.textContent === "נפסלת! נסה שוב.") messagesDiv.textContent = ""; }, 2000); }
     }
-    function gameOver() { /* ... (same as before) ... */ 
+    function gameOver() { 
         isGameOver = true; gameStarted = false; playSound('gameOver'); messagesDiv.innerHTML = `אוי לא, נגמרו החיים! <br> הגעת לשלב ${currentLevelIndex + 1}`; startButton.textContent = "שחק שוב מההתחלה"; startButton.style.display = 'block'; if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
     }
-    function checkLevelCompletion() { /* ... (same as before) ... */ 
+    function checkLevelCompletion() { 
         if (!currentLevelData) return; 
         let open = false;
         if (!currentLevelData.isBossLevel && collectedCarrotsCount >= requiredCarrots) open = true;
         if (currentLevelData.isBossLevel && enemies.length === 0) open = true; 
         if (open && exit) { exit.isOpen = true; exit.color = '#FFD700'; } 
     }
-    function levelComplete() { /* ... (same as before) ... */ 
+    function levelComplete() { 
         gameStarted = false; playSound('levelComplete'); currentLevelIndex++;
         if (currentLevelIndex >= allLevelsData.length) winGame();
         else { messagesDiv.textContent = `שלב ${currentLevelIndex} הושלם!`; startButton.textContent = `התחל שלב ${currentLevelIndex + 1}`; startButton.style.display = 'block'; playSound('nextLevel'); }
         if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
     }
-    function winGame() { /* ... (same as before) ... */ 
+    function winGame() { 
         isGameOver = true; gameStarted = false; playSound('gameWin'); messagesDiv.innerHTML = `כל הכבוד! ניצחת את המשחק! <br> סיימת את כל ${allLevelsData.length} השלבים!`; startButton.textContent = "שחק שוב מההתחלה"; startButton.style.display = 'block'; currentLevelIndex = 0; if (gameLoopId) { cancelAnimationFrame(gameLoopId); gameLoopId = null; }
     }
-    function updateHUD() { /* ... (same as before) ... */ 
+    function updateHUD() { 
         if (heartsDisplay) heartsDisplay.textContent = lives;
         if (carrotsCollectedDisplay) carrotsCollectedDisplay.textContent = collectedCarrotsCount;
         if (totalCarrotsDisplay) totalCarrotsDisplay.textContent = requiredCarrots;
     }
 
     // --- Drawing Logic ---
-    function draw() { /* ... (same as before) ... */ 
+    function draw() { 
+        // Draw Title/Game Over/Next Level screens
         if (!gameStarted || !currentLevelData) { 
              ctx.clearRect(0, 0, canvas.width, canvas.height); 
              ctx.fillStyle = '#87CEEB'; ctx.fillRect(0,0,canvas.width,canvas.height); 
@@ -387,16 +439,23 @@ document.addEventListener('DOMContentLoaded', () => {
              startButton.style.display = 'block'; 
              return; 
         }
+
+        // --- Draw Active Game Scene ---
         ctx.fillStyle = currentLevelData.bgColor || '#87CEEB'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Parallax Background
         const bgMountainX = -(cameraX * 0.1) % canvas.width; ctx.fillStyle = '#a0a0c0'; for (let i = -1; i < (canvas.width / 200) + 1; i++) { ctx.beginPath(); ctx.moveTo(bgMountainX + i * 200, INTERNAL_HEIGHT - 20); ctx.lineTo(bgMountainX + i * 200 + 100, INTERNAL_HEIGHT - 20 - 150); ctx.lineTo(bgMountainX + i * 200 + 200, INTERNAL_HEIGHT - 20); ctx.closePath(); ctx.fill(); }
         const bgHillsX = -(cameraX * 0.3) % canvas.width; ctx.fillStyle = '#6B8E63'; for (let i = -1; i < (canvas.width / 150) +1; i++) { ctx.beginPath(); ctx.arc(bgHillsX + i * 150 + 75, INTERNAL_HEIGHT - 20, 75, Math.PI, 2*Math.PI, false); ctx.fill(); }
-        ctx.save(); ctx.translate(-cameraX, 0); 
+        
+        ctx.save(); ctx.translate(-cameraX, 0); // Apply Camera
+        
+        // Draw Game Objects
         if (platforms) platforms.forEach(platform => { ctx.fillStyle = platform.color || currentLevelData.platformColor || '#6f4e37'; ctx.fillRect(platform.worldX, platform.y, platform.width, platform.height); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(platform.worldX + 3, platform.y + platform.height -3, platform.width -6, 3); });
         if (carrots) carrots.forEach(carrot => { if (!carrot.collected) { ctx.fillStyle = carrot.color; ctx.fillRect(carrot.worldX, carrot.y, carrot.width, carrot.height); ctx.fillStyle = '#228B22'; ctx.beginPath(); ctx.moveTo(carrot.worldX + carrot.width / 2, carrot.y - 5); ctx.lineTo(carrot.worldX, carrot.y); ctx.lineTo(carrot.worldX + carrot.width, carrot.y); ctx.closePath(); ctx.fill(); } });
         if (enemies) enemies.forEach(enemy => { ctx.fillStyle = enemy.color; ctx.fillRect(enemy.worldX, enemy.y, enemy.width, enemy.height); if (!enemy.isBoss) { ctx.fillStyle = 'white'; const eyeXOffset = enemy.direction > 0 ? enemy.width * 0.6 : enemy.width * 0.2; ctx.fillRect(enemy.worldX + eyeXOffset, enemy.y + 5, 5, 5); ctx.fillRect(enemy.worldX + eyeXOffset + (enemy.direction > 0 ? 7 : -7) , enemy.y + 5, 5, 5); ctx.fillStyle = 'black'; ctx.fillRect(enemy.worldX + eyeXOffset + 1, enemy.y + 7, 2, 2); ctx.fillRect(enemy.worldX + eyeXOffset + (enemy.direction > 0 ? 7 : -7) + 1, enemy.y + 7, 2, 2); } else { ctx.fillStyle = 'yellow'; ctx.fillRect(enemy.worldX + enemy.width * 0.25, enemy.y + enemy.height * 0.2, 15, 15); ctx.fillRect(enemy.worldX + enemy.width * 0.75 - 15, enemy.y + enemy.height * 0.2, 15, 15); ctx.fillStyle = 'black'; ctx.fillRect(enemy.worldX + enemy.width * 0.25 + 5, enemy.y + enemy.height * 0.2 + 5, 5, 5); ctx.fillRect(enemy.worldX + enemy.width * 0.75 - 10, enemy.y + enemy.height * 0.2 + 5, 5, 5); } });
         if (exit) { ctx.fillStyle = exit.color; ctx.fillRect(exit.worldX, exit.y, exit.width, exit.height); ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(exit.worldX + exit.width * 0.2, exit.y + exit.height * 0.2, exit.width*0.6, exit.height*0.8); if (exit.isOpen) { ctx.fillStyle = 'black'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center'; ctx.fillText("יציאה", exit.worldX + exit.width / 2, exit.y + exit.height / 2 + 5); } }
         if (player) { if (isInvincible) ctx.globalAlpha = (Math.floor(Date.now() / 100) % 2 === 0) ? 0.4 : 0.8; const playerDrawX = player.worldX; let playerVisualY = player.y; if (player.isCrouching) playerVisualY = player.y + (player.height - player.drawHeight); ctx.fillStyle = player.color; ctx.fillRect(playerDrawX, playerVisualY, player.drawWidth, player.drawHeight); const earHeight = 12, earWidth = 7; ctx.fillStyle = player.isCrouching ? player.color : '#ffc0cb'; ctx.fillRect(playerDrawX + player.drawWidth*0.2 - earWidth/2, playerVisualY - earHeight + (player.isCrouching?5:0), earWidth, earHeight); ctx.fillRect(playerDrawX + player.drawWidth*0.8 - earWidth/2, playerVisualY - earHeight + (player.isCrouching?5:0), earWidth, earHeight); ctx.globalAlpha = 1.0; }
-        ctx.restore(); 
+        
+        ctx.restore(); // Remove camera translation
     }
 
     // --- Main Game Loop ---
@@ -420,71 +479,47 @@ document.addEventListener('DOMContentLoaded', () => {
         else startGame(false);
     });
 
-    /** **REVISED** Resizes the canvas display element to fit available space while maintaining aspect ratio. */
+    /** Resizes the canvas display element to fit its container while maintaining aspect ratio. */
     function resizeCanvas() {
         const container = gameContainer; 
-        const area = gameArea;
-        if (!container || !area) {
-            console.error("Resize failed: Game container or area not found.");
-            return; 
-        }
+        if (!container) return; 
 
-        // Calculate available width = width of the gameArea container
-        const availableWidth = area.clientWidth; 
-        
-        // Calculate available height = window height minus space for messages/button
-        // Ensure elements exist before accessing offsetHeight
-        const messagesHeight = messagesDiv ? messagesDiv.offsetHeight : 0;
-        const buttonHeight = startButton ? startButton.offsetHeight : 0;
-        const bottomMargin = 20; // Extra margin for button/messages
-        const availableHeight = window.innerHeight - messagesHeight - buttonHeight - bottomMargin;
+        const containerWidth = container.clientWidth;
+        const gameArea = document.getElementById('gameArea');
+        let availableHeight = window.innerHeight - 40; 
+        if (gameArea) {
+             // Estimate height needed for messages and button
+             const uiHeight = messagesDiv.offsetHeight + startButton.offsetHeight + 30; // Add some margin
+             availableHeight = gameArea.clientHeight - uiHeight; 
+        }
+        availableHeight = Math.max(100, availableHeight); // Ensure minimum reasonable height
+
 
         let newWidth, newHeight;
-
-        // Determine the limiting dimension based on aspect ratio
-        if (availableWidth / availableHeight > ASPECT_RATIO) {
-            // Available space is wider than game aspect ratio -> height is the limiting factor
+        if (containerWidth / availableHeight > ASPECT_RATIO) {
             newHeight = availableHeight;
             newWidth = newHeight * ASPECT_RATIO;
         } else {
-            // Available space is taller than game aspect ratio (or equal) -> width is the limiting factor
-            newWidth = availableWidth;
+            newWidth = containerWidth;
             newHeight = newWidth / ASPECT_RATIO;
         }
         
-        // Ensure minimum size and clamp to max width
-        newWidth = Math.max(150, Math.min(newWidth, INTERNAL_WIDTH)); // Min width 150, Max width INTERNAL_WIDTH
-        newHeight = newWidth / ASPECT_RATIO; // Recalculate height based on potentially clamped width
+        newWidth = Math.max(150, newWidth); 
+        newHeight = Math.max(75, newHeight); 
 
-        // Apply the calculated size to the canvas *style*
         canvas.style.width = `${newWidth}px`;
         canvas.style.height = `${newHeight}px`;
-        
-        // Also set the container's height and width to match the canvas
-        container.style.width = `${newWidth}px`; 
         container.style.height = `${newHeight}px`; 
 
-        // Force a redraw using requestAnimationFrame to ensure it happens after layout updates
-        requestAnimationFrame(draw); 
+        // Redraw immediately after resize
+        requestAnimationFrame(draw); // Use rAF for smoother redraw
     }
 
     // Initial resize and add listeners for window resize/orientation change
     window.addEventListener('resize', resizeCanvas);
-    // Use screen.orientation API if available (more reliable)
-    if (screen.orientation) {
-        screen.orientation.addEventListener('change', () => {
-             // Add a small delay after orientation change for layout to stabilize
-             setTimeout(resizeCanvas, 100);
-        });
-    } else {
-        // Fallback for older browsers/devices
-        window.addEventListener('orientationchange', () => {
-            setTimeout(resizeCanvas, 100);
-        });
-    }
-
-    // Delay initial resize slightly, especially for mobile
-    setTimeout(resizeCanvas, 150); 
+    window.addEventListener('orientationchange', resizeCanvas);
+    // Delay initial resize slightly to allow layout to settle
+    setTimeout(resizeCanvas, 100); 
 
     // Initial Screen Setup
     messagesDiv.textContent = "הרפתקאות בובו הארנב";
@@ -492,4 +527,4 @@ document.addEventListener('DOMContentLoaded', () => {
     startButton.style.display = 'block';
     draw(); // Draw the initial title screen
 
-}); // End DOMContentLoaded
+}); // End DOMContentLoa
