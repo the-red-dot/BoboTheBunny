@@ -1,8 +1,3 @@
-/**
- * Bobo's Adventure Game
- * * A multi-level 2D platformer with scrolling, progressive difficulty,
- * sound effects, responsive design with swipe controls.
- */
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements ---
     const canvas = document.getElementById('gameCanvas');
@@ -14,7 +9,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const carrotsCollectedDisplay = document.getElementById('carrotsCollected');
     const totalCarrotsDisplay = document.getElementById('totalCarrotsInLevel');
     // Note: References to old touch buttons (touchLeft, etc.) are effectively removed
-    // as they are no longer used by the event listeners below.
 
     // --- Game Constants ---
     const INTERNAL_WIDTH = 800;  // Fixed internal resolution width
@@ -36,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SWIPE_THRESHOLD_X = 20;  // Min horizontal distance for swipe movement
     const SWIPE_THRESHOLD_Y_JUMP = -40; // Min *negative* vertical distance for jump swipe
     const SWIPE_THRESHOLD_Y_CROUCH = 40; // Min positive vertical distance for crouch swipe
-    const MAX_SWIPE_SPEED_DIST_X = 150; // Horizontal distance at which max speed is reached (currently unused, running is binary)
+    const MAX_SWIPE_SPEED_DIST_X = 150; // Horizontal distance at which max speed is reached (currently unused)
 
     // --- Game State Variables ---
     let cameraX = 0;
@@ -81,10 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
         gameWin: new Tone.PolySynth(Tone.Synth, { oscillator: {type: "triangle"}, envelope: { attack: 0.1, decay: 0.5, sustain: 0.3, release: 0.5}, volume: -8}).toDestination(),
     };
 
-    /**
-     * Plays a predefined sound effect.
-     * @param {string} soundName - The name of the sound to play (key in the sounds object).
-     */
+    /** Plays a predefined sound effect. */
     function playSound(soundName) {
         if (!soundsInitialized || !sounds[soundName]) return;
         try {
@@ -100,9 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { console.error("Error playing sound:", soundName, error); }
     }
 
-    /**
-     * Initializes the Tone.js audio context. Must be called after user interaction.
-     */
+    /** Initializes the Tone.js audio context. */
     async function initializeSounds() {
         if (soundsInitialized) return;
         try {
@@ -171,8 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
         { width: 4200, bgColor: '#9db4c0', groundColor: '#778899', platformColor: '#5c6b73', platforms: [ { worldX: 0, y: INTERNAL_HEIGHT - 20, width: 150, height: 20 }, { worldX: 500, y: INTERNAL_HEIGHT - 20, width: 200, height: 20 }, { worldX: 1200, y: INTERNAL_HEIGHT - 20, width: 180, height: 20 }, { worldX: 2000, y: INTERNAL_HEIGHT - 20, width: 250, height: 20 }, { worldX: 3800, y: INTERNAL_HEIGHT - 20, width: 4200 - 3800, height: 20 }, ...generatePlatforms(4200, 50, 18, 40, 80, 120, 200, true, 0.5) ], carrots: [], enemies: generateEnemies(4200, 7, 50, 1.6, 150), exitY: INTERNAL_HEIGHT - 80, requiredCarrotsFraction: 0.8 },
     ];
 
-    // Now, create the final array using the initial levels
-    const allLevelsData = [...initialLevels]; // Start with levels 1-5
+    // **FIXED:** Create the final array *after* initial levels are defined
+    const allLevelsData = [...initialLevels]; 
 
     // Auto-generate levels 6-10 and push them
     const level5Data = allLevelsData[4]; // Base the generation on level 5 data
@@ -207,10 +196,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Loads level data, resets player/camera, generates procedural elements. */
     function loadLevel(levelIndex) {
         if (levelIndex >= allLevelsData.length) { winGame(); return; }
-        // Deep copy level data to prevent modifications affecting the original definition
         currentLevelData = JSON.parse(JSON.stringify(allLevelsData[levelIndex])); 
-
-        // Initialize Level Elements
         currentLevelData.platforms.forEach(p => {
             if (!p.color) p.color = (p.y === INTERNAL_HEIGHT - 20) ? currentLevelData.groundColor : currentLevelData.platformColor;
             if (p.type === 'moving' && p.originalWorldX === undefined) p.originalWorldX = p.worldX;
@@ -222,12 +208,9 @@ document.addEventListener('DOMContentLoaded', () => {
         platforms = currentLevelData.platforms; carrots = currentLevelData.carrots; enemies = currentLevelData.enemies;
         requiredCarrots = currentLevelData.isBossLevel ? 0 : Math.ceil(carrots.length * currentLevelData.requiredCarrotsFraction);
         exit = { worldX: currentLevelData.width - 100, y: currentLevelData.exitY || INTERNAL_HEIGHT - 60, width: 50, height: 50, color: '#6c757d', isOpen: false };
-        
-        // Reset Player State
         player = { worldX: 100, y: INTERNAL_HEIGHT - 100, width: 30, height: 40, drawWidth: 30, drawHeight: 40, color: '#007bff', velocityX: 0, velocityY: 0, isJumping: false, isOnGround: false, isCrouching: false, canVariableJump: false, jumpButtonPressedTime: 0 };
         collectedCarrotsCount = 0; cameraX = 0; currentSpeed = PLAYER_SPEED;
         isGameOver = false; gameStarted = true;
-        
         updateHUD();
         messagesDiv.textContent = `שלב ${levelIndex + 1}`;
         setTimeout(() => { if (messagesDiv.textContent === `שלב ${levelIndex + 1}`) messagesDiv.textContent = ""; }, 1500);
@@ -264,16 +247,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function getTouchPos(canvasDom, touchEvent) {
         const rect = canvasDom.getBoundingClientRect();
         const touch = touchEvent.changedTouches[0]; 
-        return {
-            x: (touch.clientX - rect.left) * (INTERNAL_WIDTH / canvasDom.clientWidth),
-            y: (touch.clientY - rect.top) * (INTERNAL_HEIGHT / canvasDom.clientHeight)
-        };
+        const scaledX = (touch.clientX - rect.left) * (INTERNAL_WIDTH / canvasDom.clientWidth);
+        const scaledY = (touch.clientY - rect.top) * (INTERNAL_HEIGHT / canvasDom.clientHeight);
+        return { x: scaledX, y: scaledY };
     }
     canvas.addEventListener('touchstart', (e) => {
         e.preventDefault(); 
         if (isGameOver || !gameStarted) return; 
         if (!isTouching) { 
             const pos = getTouchPos(canvas, e);
+            // console.log("Touch Start:", pos); // DEBUG
             touchStartX = pos.x; touchStartY = pos.y;
             touchCurrentX = pos.x; touchCurrentY = pos.y;
             isTouching = true; touchJumped = false; touchCrouched = false; 
@@ -290,20 +273,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const pos = getTouchPos(canvas, e); 
         touchCurrentX = pos.x; touchCurrentY = pos.y;
         const deltaX = touchCurrentX - touchStartX; const deltaY = touchCurrentY - touchStartY;
+        // console.log(`Touch Move: dX=${deltaX.toFixed(1)}, dY=${deltaY.toFixed(1)} | Jumped=${touchJumped}, Crouched=${touchCrouched}`); // DEBUG
+
         // Horizontal Movement
         if (Math.abs(deltaX) > SWIPE_THRESHOLD_X) {
+            // console.log("Horizontal Threshold Met"); // DEBUG
             if (deltaX > 0) { keys['ArrowRight'] = true; keys['ArrowLeft'] = false; } 
             else { keys['ArrowLeft'] = true; keys['ArrowRight'] = false; }
             currentSpeed = PLAYER_RUN_SPEED; 
-        } else { keys['ArrowLeft'] = false; keys['ArrowRight'] = false; currentSpeed = PLAYER_SPEED; }
+        } else { 
+            keys['ArrowLeft'] = false; keys['ArrowRight'] = false; 
+            // Reset speed only if keyboard isn't also pressing a direction
+            if (!keys['ArrowLeft'] && !keys['ArrowRight']) { 
+                 currentSpeed = PLAYER_SPEED;
+            }
+        }
         // Vertical Movement (Jump/Crouch)
         if (deltaY < SWIPE_THRESHOLD_Y_JUMP && !touchJumped && player.isOnGround) { // Swipe Up
+            // console.log("Jump Threshold Met"); // DEBUG
             player.isJumping = true; player.isOnGround = false;
             let jumpBoost = Math.min(MAX_JUMP_BOOST, Math.abs(deltaY + SWIPE_THRESHOLD_Y_JUMP) * 0.05);
             player.velocityY = -(JUMP_FORCE + jumpBoost);
             playSound('jump'); touchJumped = true; 
             keys['ArrowLeft'] = false; keys['ArrowRight'] = false; 
         } else if (deltaY > SWIPE_THRESHOLD_Y_CROUCH && !touchCrouched && player.isOnGround && !player.isCrouching) { // Swipe Down
+            // console.log("Crouch Threshold Met"); // DEBUG
             keys['ArrowDown'] = true; 
             player.isCrouching = true; player.drawHeight = 25; player.drawWidth = 35;
             touchCrouched = true; 
@@ -314,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let endedOurTouch = false;
         for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === touchId) { endedOurTouch = true; break; } }
         if (isTouching && endedOurTouch) {
+            // console.log("Touch End"); // DEBUG
             isTouching = false; touchId = null; 
             keys['ArrowLeft'] = false; keys['ArrowRight'] = false; keys['ArrowDown'] = false;
             if (touchCrouched && player && player.isCrouching) { player.isCrouching = false; player.drawHeight = player.height; player.drawWidth = player.width; }
@@ -325,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
          let cancelledOurTouch = false;
          for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === touchId) { cancelledOurTouch = true; break; } }
         if (isTouching && cancelledOurTouch) {
+            // console.log("Touch Cancel"); // DEBUG
              isTouching = false; touchId = null;
              keys['ArrowLeft'] = false; keys['ArrowRight'] = false; keys['ArrowDown'] = false;
              if (touchCrouched && player && player.isCrouching) { player.isCrouching = false; player.drawHeight = player.height; player.drawWidth = player.width; }
@@ -393,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
         platforms.forEach(platform => { const platformHitbox = { x: platform.worldX, y: platform.y, width: platform.width, height: platform.height }; if (isRectColliding(playerHitbox, platformHitbox)) { const prevPlayerBottom = (player.y + playerHitbox.height) - player.velocityY; if (player.velocityY >= 0 && prevPlayerBottom <= platform.y + 1) { player.y = platform.y - playerHitbox.height; player.velocityY = 0; player.isJumping = false; player.isOnGround = true; onAnyPlatform = true; if (platform.type === 'moving' && player.isOnGround) player.worldX += platform.speed * platform.dir; } else if (player.velocityY < 0 && player.y - player.velocityY >= platform.y + platform.height -1) { player.y = platform.y + platform.height; player.velocityY = 0; } else { if (player.velocityX > 0 && playerHitbox.x + playerHitbox.width - player.velocityX <= platform.worldX) { player.worldX = platform.worldX - playerHitbox.width; player.velocityX = 0; } else if (player.velocityX < 0 && playerHitbox.x - player.velocityX >= platform.worldX + platform.width) { player.worldX = platform.worldX + platform.width; player.velocityX = 0; } } } });
         carrots.forEach((carrot) => { if (!carrot.collected && isRectColliding(playerHitbox, {x: carrot.worldX, y: carrot.y, width: carrot.width, height: carrot.height})) { carrot.collected = true; collectedCarrotsCount++; playSound('collect'); updateHUD(); checkLevelCompletion(); } });
         enemies.forEach(enemy => { const enemyHitbox = { x: enemy.worldX, y: enemy.y, width: enemy.width, height: enemy.height }; if (isRectColliding(playerHitbox, enemyHitbox) && !isInvincible) { if (enemy.isBoss){ loseLife(); return; } const prevPlayerBottom = (player.y + playerHitbox.height) - player.velocityY; if (player.velocityY > 0 && prevPlayerBottom < enemy.y + 5 && !player.isCrouching) { enemies.splice(enemies.indexOf(enemy), 1); player.velocityY = -JUMP_FORCE / 1.5; player.isJumping = true; player.isOnGround = false; playSound('stomp'); } else loseLife(); } });
-        if (exit && exit.isOpen && isRectColliding(playerHitbox, {x: exit.worldX, y: exit.y, width: exit.width, height: exit.height})) levelComplete(); // Added null check for exit
+        if (exit && exit.isOpen && isRectColliding(playerHitbox, {x: exit.worldX, y: exit.y, width: exit.width, height: exit.height})) levelComplete(); 
     }
     /** Basic rectangle collision check. */
     function isRectColliding(rect1, rect2) { 
@@ -440,7 +436,6 @@ document.addEventListener('DOMContentLoaded', () => {
              if (!isGameOver && startButton.textContent === "התחל משחק") {
                  messagesDiv.textContent = "הרפתקאות בובו הארנב";
              }
-             // Keep existing message if game over or between levels
              startButton.style.display = 'block'; 
              return; 
         }
@@ -453,7 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         ctx.save(); ctx.translate(-cameraX, 0); // Apply Camera
         
-        // Draw Game Objects (Platforms, Carrots, Enemies, Exit, Player)
+        // Draw Game Objects
         if (platforms) platforms.forEach(platform => { ctx.fillStyle = platform.color || currentLevelData.platformColor || '#6f4e37'; ctx.fillRect(platform.worldX, platform.y, platform.width, platform.height); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(platform.worldX + 3, platform.y + platform.height -3, platform.width -6, 3); });
         if (carrots) carrots.forEach(carrot => { if (!carrot.collected) { ctx.fillStyle = carrot.color; ctx.fillRect(carrot.worldX, carrot.y, carrot.width, carrot.height); ctx.fillStyle = '#228B22'; ctx.beginPath(); ctx.moveTo(carrot.worldX + carrot.width / 2, carrot.y - 5); ctx.lineTo(carrot.worldX, carrot.y); ctx.lineTo(carrot.worldX + carrot.width, carrot.y); ctx.closePath(); ctx.fill(); } });
         if (enemies) enemies.forEach(enemy => { ctx.fillStyle = enemy.color; ctx.fillRect(enemy.worldX, enemy.y, enemy.width, enemy.height); if (!enemy.isBoss) { ctx.fillStyle = 'white'; const eyeXOffset = enemy.direction > 0 ? enemy.width * 0.6 : enemy.width * 0.2; ctx.fillRect(enemy.worldX + eyeXOffset, enemy.y + 5, 5, 5); ctx.fillRect(enemy.worldX + eyeXOffset + (enemy.direction > 0 ? 7 : -7) , enemy.y + 5, 5, 5); ctx.fillStyle = 'black'; ctx.fillRect(enemy.worldX + eyeXOffset + 1, enemy.y + 7, 2, 2); ctx.fillRect(enemy.worldX + eyeXOffset + (enemy.direction > 0 ? 7 : -7) + 1, enemy.y + 7, 2, 2); } else { ctx.fillStyle = 'yellow'; ctx.fillRect(enemy.worldX + enemy.width * 0.25, enemy.y + enemy.height * 0.2, 15, 15); ctx.fillRect(enemy.worldX + enemy.width * 0.75 - 15, enemy.y + enemy.height * 0.2, 15, 15); ctx.fillStyle = 'black'; ctx.fillRect(enemy.worldX + enemy.width * 0.25 + 5, enemy.y + enemy.height * 0.2 + 5, 5, 5); ctx.fillRect(enemy.worldX + enemy.width * 0.75 - 10, enemy.y + enemy.height * 0.2 + 5, 5, 5); } });
@@ -467,11 +462,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function gameLoop() {
         if (!isGameOver && gameStarted) { updatePlayer(); updateCamera(); updateEnemies(); updatePlatforms(); checkCollisions(); }
         draw();
-        // Continue loop if game active OR on a screen where interaction is possible (start button visible)
         if (gameStarted || startButton.style.display === 'block') {
             gameLoopId = requestAnimationFrame(gameLoop);
         } else {
-            gameLoopId = null; // Ensure loop stops if game ends and button is hidden
+            gameLoopId = null; 
         }
     }
 
@@ -488,47 +482,37 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Resizes the canvas display element to fit its container while maintaining aspect ratio. */
     function resizeCanvas() {
         const container = gameContainer; 
-        if (!container) return; // Exit if container not found
+        if (!container) return; 
 
         const containerWidth = container.clientWidth;
-        // Calculate available height more reliably, considering sibling elements
         const gameArea = document.getElementById('gameArea');
-        let availableHeight = window.innerHeight - 40; // Start with viewport height minus some padding/margin
+        let availableHeight = window.innerHeight - 40; 
         if (gameArea) {
-             availableHeight = gameArea.clientHeight - (messagesDiv.offsetHeight + startButton.offsetHeight + 30); // Subtract space for messages/button + margin
+             // Estimate height needed for messages and button
+             const uiHeight = messagesDiv.offsetHeight + startButton.offsetHeight + 30; // Add some margin
+             availableHeight = gameArea.clientHeight - uiHeight; 
         }
-        availableHeight = Math.max(100, availableHeight); // Ensure minimum height
+        availableHeight = Math.max(100, availableHeight); // Ensure minimum reasonable height
 
 
         let newWidth, newHeight;
-
-        // Calculate the best fit based on aspect ratio within available space
         if (containerWidth / availableHeight > ASPECT_RATIO) {
-            // Available space is wider than game aspect ratio -> height is the limiting factor
             newHeight = availableHeight;
             newWidth = newHeight * ASPECT_RATIO;
         } else {
-            // Available space is taller than game aspect ratio -> width is the limiting factor
             newWidth = containerWidth;
             newHeight = newWidth / ASPECT_RATIO;
         }
         
-        // Ensure minimum size (optional, but good for usability)
         newWidth = Math.max(150, newWidth); 
         newHeight = Math.max(75, newHeight); 
 
-
-        // Apply the calculated size to the canvas *style*
         canvas.style.width = `${newWidth}px`;
         canvas.style.height = `${newHeight}px`;
-        
-        // Adjust container height to match canvas height for better layout
         container.style.height = `${newHeight}px`; 
 
-        // Redraw immediately after resize if game isn't actively looping but is visible
-        if (!gameLoopId && (gameStarted || isGameOver || startButton.style.display === 'block')) {
-             requestAnimationFrame(draw); // Use rAF for smoother redraw after resize
-        }
+        // Redraw immediately after resize
+        requestAnimationFrame(draw); // Use rAF for smoother redraw
     }
 
     // Initial resize and add listeners for window resize/orientation change
@@ -543,4 +527,4 @@ document.addEventListener('DOMContentLoaded', () => {
     startButton.style.display = 'block';
     draw(); // Draw the initial title screen
 
-}); // End DOMContentLoaded
+}); // End DOMContentLoa
