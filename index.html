@@ -2,90 +2,90 @@
 <html lang="he">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>הרפתקאות בובו הארנב - שליטת מגע</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>הרפתקאות בובו הארנב - שליטת מגע משופרת</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <style>
         /* Basic reset and body styling */
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%; /* Ensure body takes full height */
-            overflow: hidden; /* Prevent scrolling on the body */
-            background-color: #2c3e50; /* Dark background */
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            /* Improve touch interaction: disable default actions like pinch-zoom, remove tap highlight */
-            touch-action: none;
-            -webkit-tap-highlight-color: transparent;
+        html {
+            height: 100%; /* Ensure html takes full height */
         }
-
-        /* Center the main game area */
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center; /* Center content vertically */
-            padding: 5px; /* Small padding around the edges */
+            /* Use justify-content: space-around to push content apart vertically */
+            justify-content: space-around; 
+            min-height: 100%; /* Ensure body tries to fill height */
+            margin: 0;
+            padding: 5px; /* Minimal padding */
             box-sizing: border-box;
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            /* Allow vertical scrolling ONLY if content overflows significantly */
+            overflow-x: hidden; 
+            overflow-y: auto; 
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* Container for the game canvas and UI elements below it */
+        /* Container for the entire game interface */
         #gameArea {
             display: flex;
             flex-direction: column;
             align-items: center;
             width: 100%;
-            max-width: 800px; /* Max width constraint, matches internal canvas width */
+            max-width: 800px; /* Max width constraint */
+            flex-shrink: 0; /* Prevent game area from shrinking too much */
+            padding-bottom: 10px; /* Add some space at the bottom */
         }
 
         /* Container specifically for the canvas */
         #gameContainer {
-            position: relative; /* Needed for absolute positioning of HUD */
+            position: relative; /* For HUD */
             width: 100%; /* Takes full width of gameArea */
             max-width: 800px;
-            margin: 10px auto; /* Add some margin top/bottom */
+            margin: 5px auto; /* Reduced margin */
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
             border-radius: 10px;
-            overflow: hidden; /* Clip canvas corners if needed */
-            /* Height will be set by JavaScript via canvas style */
+            overflow: hidden; 
+            /* Height will be set by JS */
         }
 
         /* Canvas styling */
         canvas#gameCanvas {
-            display: block; /* Remove extra space below canvas */
-            width: 100%; /* Canvas element fills container width */
-            height: 100%; /* Canvas element fills container height */
-            /* The actual display size (style.width/height) is set by JS resizeCanvas */
+            display: block; /* Remove extra space */
+            width: 100%;   /* Fill container width */
+            height: 100%;  /* Fill container height (set by JS) */
             border: 2px solid #34495e;
             border-radius: 8px;
-            background-color: #87CEEB; /* Default background, can be overridden by level */
+            background-color: #87CEEB; /* Default background */
             box-sizing: border-box;
-            touch-action: none; /* Crucial: Prevent default browser touch actions (like scroll) on the canvas itself */
+            touch-action: none; /* Prevent default touch actions like scroll/zoom */
         }
 
         /* HUD Styling */
         #hud {
-            position: absolute; /* Position relative to gameContainer */
-            top: 10px;
-            left: 10px;
-            font-size: clamp(12px, 3vw, 18px); /* Responsive font size */
+            position: absolute; 
+            top: 8px; /* Slightly smaller spacing */
+            left: 8px;
+            font-size: clamp(11px, 2.5vw, 16px); /* Adjusted responsive font size */
             color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
-            z-index: 10; /* Ensure HUD is above canvas */
-            background-color: rgba(0, 0, 0, 0.35);
-            padding: 8px 12px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+            z-index: 10; 
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 6px 10px; /* Adjusted padding */
             border-radius: 6px;
-            pointer-events: none; /* Allow touches to pass through HUD to canvas below */
+            pointer-events: none; 
         }
 
         /* Message area styling */
         #messages {
-            margin-top: 15px;
-            font-size: clamp(16px, 4vw, 20px); /* Responsive font size */
-            color: #f1c40f; /* Gold color */
+            margin-top: 10px; /* Reduced margin */
+            font-size: clamp(14px, 3.5vw, 18px); 
+            color: #f1c40f; 
             text-align: center;
-            min-height: 22px; /* Reserve space */
+            min-height: 20px; 
             font-weight: bold;
             width: 90%;
             max-width: 600px;
@@ -93,26 +93,25 @@
 
         /* Start button styling */
         button#startButton {
-            padding: clamp(10px, 2.5vw, 12px) clamp(20px, 5vw, 28px); /* Responsive padding */
-            font-size: clamp(14px, 3.5vw, 18px); /* Responsive font size */
+            padding: clamp(10px, 2.5vw, 12px) clamp(20px, 5vw, 28px); 
+            font-size: clamp(14px, 3.5vw, 18px); 
             font-weight: bold;
             cursor: pointer;
-            margin-top: 15px;
-            background: linear-gradient(145deg, #3498db, #2980b9); /* Blue gradient */
+            margin-top: 10px; /* Reduced margin */
+            background: linear-gradient(145deg, #3498db, #2980b9); 
             color: white;
             border: none;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.2);
             transition: background 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
+            flex-shrink: 0; /* Prevent button from shrinking */
         }
         button#startButton:hover {
             background: linear-gradient(145deg, #2980b9, #1f638f);
         }
         button#startButton:active {
-            transform: translateY(1px); /* Subtle press effect */
+            transform: translateY(1px); 
         }
-
-        /* The old touchControls div styling is removed as the div is gone */
 
     </style>
 </head>
@@ -126,8 +125,7 @@
         </div>
         <div id="messages">טוען...</div>
         <button id="startButton" style="display:none;">התחל משחק</button>
-
-        </div>
+    </div>
 
     <script src="game.js"></script>
 </body>
