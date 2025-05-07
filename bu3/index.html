@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>הרפתקאות בובו הארנב - רספונסיבי</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* Center content vertically */
+            min-height: 100vh; /* Use min-height for full viewport */
+            margin: 0;
+            padding: 10px; /* Add some padding for smaller screens */
+            box-sizing: border-box;
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            overflow: hidden; /* Prevent body scrollbars */
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+        }
+
+        #gameArea {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 800px; /* Max width of the game, canvas will scale within this */
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            /* Maintain aspect ratio 2:1 (800x400) */
+            /* For a more robust aspect ratio solution, JS might be needed if padding trick is complex with other elements */
+            max-width: 800px; /* Canvas's design width */
+            margin: 0 auto; /* Center it */
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        canvas#gameCanvas {
+            display: block;
+            width: 100%; /* Canvas scales to container */
+            height: auto;  /* Maintain aspect ratio based on width */
+            max-height: calc(100vw * 0.5); /* Max height based on viewport width for 2:1 ratio */
+            /* If gameArea max-width is 800px, this means max-height 400px for canvas */
+            min-height: 200px; /* Minimum height for very narrow screens */
+            border: 2px solid #34495e;
+            border-radius: 8px;
+            background-color: #87CEEB;
+        }
+        
+        /* Fallback for aspect ratio if height:auto has issues with parent flex */
+        @media (orientation: landscape) {
+            #gameContainer {
+                 max-height: calc(100vh - 150px); /* Adjust based on touch controls height */
+            }
+            canvas#gameCanvas {
+                max-height: 100%;
+                width: auto; /* Let height dictate width in landscape if container has max-height */
+                max-width: 100%;
+            }
+        }
+         @media (orientation: portrait) {
+            canvas#gameCanvas {
+                max-height: 50vh; /* Limit height in portrait */
+            }
+        }
+
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: clamp(12px, 3vw, 18px); /* Responsive font size */
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.6);
+            z-index: 10;
+            background-color: rgba(0, 0, 0, 0.35);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+
+        #messages {
+            margin-top: 15px;
+            font-size: clamp(16px, 4vw, 20px);
+            color: #f1c40f;
+            text-align: center;
+            min-height: 22px;
+            font-weight: bold;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        button#startButton {
+            padding: clamp(10px, 2.5vw, 12px) clamp(20px, 5vw, 28px);
+            font-size: clamp(14px, 3.5vw, 18px);
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: background 0.3s ease, transform 0.1s ease, box-shadow 0.3s ease;
+        }
+        button#startButton:hover {
+            background: linear-gradient(145deg, #2980b9, #1f638f);
+        }
+        button#startButton:active {
+            transform: translateY(1px);
+        }
+
+        #touchControls {
+            display: none; /* Hidden by default, shown by JS if touch is detected or for small screens */
+            width: 100%;
+            max-width: 400px; /* Limit width of touch controls area */
+            margin-top: 15px;
+            padding: 10px 0;
+            background-color: rgba(0,0,0,0.1);
+            border-radius: 10px;
+            user-select: none; /* Prevent text selection on buttons */
+            -webkit-user-select: none;
+        }
+
+        .touch-row {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+         .touch-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .touch-button {
+            background-color: rgba(52, 152, 219, 0.7);
+            color: white;
+            border: 2px solid rgba(41, 128, 185, 0.9);
+            border-radius: 50%; /* Circular buttons */
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .touch-button:active {
+            background-color: rgba(41, 128, 185, 1);
+            transform: scale(0.95);
+        }
+        
+        /* Specific styles for action buttons */
+        .action-button {
+             width: 70px;
+             height: 70px;
+             font-size: 20px;
+        }
+
+
+        /* Show touch controls on smaller screens or touch devices */
+        @media (hover: none) and (pointer: coarse), (max-width: 768px) {
+            #touchControls {
+                display: flex;
+                flex-direction: column;
+            }
+        }
+         /* Adjust layout for very small screens */
+        @media (max-width: 360px) {
+            .touch-button {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+            .action-button {
+                width: 60px;
+                height: 60px;
+            }
+            #hud {
+                font-size: 10px;
+                padding: 5px 8px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div id="gameArea">
+        <div id="gameContainer">
+            <div id="hud">
+                לבבות: <span id="hearts">3</span> | גזרים: <span id="carrotsCollected">0</span>/<span id="totalCarrotsInLevel">0</span>
+            </div>
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div id="messages">טוען...</div>
+        <button id="startButton" style="display:none;">התחל משחק</button>
+
+        <div id="touchControls">
+            <div class="touch-row">
+                <div class="touch-button" id="touchLeft">&#x2190;</div> <div class="touch-button action-button" id="touchJump">קפוץ</div> <div class="touch-button" id="touchRight">&#x2192;</div> </div>
+             <div class="touch-row">
+                <div class="touch-button" id="touchCrouch">&#x2193;</div> </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
